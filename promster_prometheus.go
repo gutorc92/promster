@@ -1,36 +1,41 @@
 package main
 
 import (
-	"fmt"
 	"flag"
-	"gopkg.in/yaml.v1"
+	"fmt"
 	"os"
+
 	"github.com/prometheus/prometheus/config"
+	"gopkg.in/yaml.v1"
 )
 
-var configPromster config.Config
+type PrometheusConfig config.Config
 
-func RegisterFlags(f *flag.FlagSet) {
+func NewPrometheusConfig() *PrometheusConfig {
+	var config PrometheusConfig
+	return &config
+}
+
+func (cfg *PrometheusConfig) RegisterFlags(f *flag.FlagSet) {
 	var (
-		scrapeInterval string
-		scrapeTimeout string
-		scrapeMatch string
+		scrapeMatch          string
 		scrapeShardingEnable bool
-		evaluationInterval string
-		scheme string
+		evaluationInterval   string
+		scheme               string
 	)
-	flag.IntVar(&configPromster.GlobalConfig.ScrapeInterval, "scrape-interval", 30, "Prometheus scrape interval")
-	flag.IntVar(&configPromster.GlobalConfig.ScrapeTimeout, "scrape-timeout", 30, "Prometheus scrape timeout")
+	log.Infof("Testando")
+	log.Debugf("Config scrape interval %s", cfg.GlobalConfig.ScrapeInterval)
+	flag.Var(&cfg.GlobalConfig.ScrapeInterval, "scrape-interval", "Prometheus scrape interval")
+	flag.Var(&cfg.GlobalConfig.ScrapeTimeout, "scrape-timeout", "Prometheus scrape timeout")
 	flag.StringVar(&scrapeMatch, "scrape-match", "", "Metrics regex filter applied on scraped targets. Commonly used in conjunction with /federate metrics endpoint")
 	flag.BoolVar(&scrapeShardingEnable, "scrape-shard-enable", false, "Enable sharding distribution among targets so that each Promster instance will scrape a different set of targets, enabling distribution of load among instances. Defaults to true.")
 	flag.StringVar(&evaluationInterval, "evaluation-interval", "30s", "Prometheus evaluation interval")
 	flag.StringVar(&scheme, "scheme", "http", "Scrape scheme, either http or https")
-	flag.Parse()
-	
+
 }
 
-func createConfig () {
-	d, err := yaml.Marshal(&config.GlobalConfig)
+func (cfg *PrometheusConfig) PrintConfig() {
+	d, err := yaml.Marshal(&cfg.GlobalConfig)
 	if err != nil {
 		log.Fatalf("error: %v", err)
 	}
@@ -44,5 +49,5 @@ func createConfig () {
 		log.Fatalf("error: %v", err)
 	}
 	fmt.Println(l, "bytes written successfully")
-	fmt.Println("Global config", config.GlobalConfig.ScrapeInterval)
+	fmt.Println("Global config", cfg.GlobalConfig.ScrapeInterval)
 }

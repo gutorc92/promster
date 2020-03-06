@@ -3,8 +3,9 @@ package main
 import (
 	"flag"
 	"os"
-	"github.com/sirupsen/logrus"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 var log = logrus.New()
@@ -26,14 +27,18 @@ func setLogLevel(logLevel *string) {
 	}
 }
 func main() {
-	createConfig()
 	var cfg *PromsterEtcd
+	var cfgPrometheus *PrometheusConfig
 	cfg = NewPromsterEtcd()
+	cfgPrometheus = NewPrometheusConfig()
 	log.Out = os.Stdout
 	logLevel := flag.String("loglevel", "info", "debug, info, warning, error")
 	flagSet := flag.NewFlagSet("etcd", flag.ContinueOnError)
+	flagSetPromster := flag.NewFlagSet("prometheus", flag.ContinueOnError)
 	cfg.RegisterFlags(flagSet)
+	cfgPrometheus.RegisterFlags(flagSetPromster)
 	flag.Parse()
+	cfgPrometheus.PrintConfig()
 	setLogLevel(logLevel)
 	cfg.CheckFlags()
 	log.Debugf("Testandoo valor: %s ", cfg.etcdURLRegistry)
@@ -41,7 +46,7 @@ func main() {
 	CreateEtcd(cfg)
 	log.Debugf("Initializing ETCD client for source scrape targets")
 	log.Infof("Starting to watch source scrape targets. etcdURLScrape=%s", cfg.etcdURLScrape)
-	
+
 	cfg.createTargets()
 
 	promNodes := make([]string, 0)
@@ -56,9 +61,9 @@ func main() {
 
 	for {
 		select {
-		case promNodes = <- cfg.nodesChan:
+		case promNodes = <-cfg.nodesChan:
 			log.Debugf("updated promNodes: %s", promNodes)
-		case scrapeTargets = <- cfg.sourceTargetsChan:
+		case scrapeTargets = <-cfg.sourceTargetsChan:
 			log.Debugf("updated scapeTargets: %s", scrapeTargets)
 		}
 		// err := updatePrometheusTargets(scrapeTargets, promNodes, scrapeShardingEnable)

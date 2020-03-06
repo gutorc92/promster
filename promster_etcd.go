@@ -7,9 +7,9 @@ import (
 	"path"
 	"strings"
 	"time"
+
 	"github.com/coreos/etcd/clientv3"
 	etcdregistry "github.com/flaviostutz/etcd-registry/etcd-registry"
-
 )
 
 type SourceTarget struct {
@@ -18,15 +18,15 @@ type SourceTarget struct {
 }
 
 type PromsterEtcd struct {
-	etcdURLRegistry string
-	etcdBase        string
-	etcdServiceName string
-	etcdServiceTTL  int
-	etcdURLScrape   string
-	scrapeEtcdPath  string
-	cliScrape 	  	*clientv3.Client
+	etcdURLRegistry   string
+	etcdBase          string
+	etcdServiceName   string
+	etcdServiceTTL    int
+	etcdURLScrape     string
+	scrapeEtcdPath    string
+	cliScrape         *clientv3.Client
 	sourceTargetsChan chan []SourceTarget
-	nodesChan chan []string
+	nodesChan         chan []string
 }
 
 func (cfg *PromsterEtcd) RegisterFlags(f *flag.FlagSet) {
@@ -38,14 +38,14 @@ func (cfg *PromsterEtcd) RegisterFlags(f *flag.FlagSet) {
 	flag.StringVar(&cfg.scrapeEtcdPath, "scrape-etcd-path", "", "Base ETCD path for getting servers to be scrapped")
 }
 
-func (cfg *PromsterEtcd) hasEtcdRegistry () bool {
+func (cfg *PromsterEtcd) hasEtcdRegistry() bool {
 	if cfg.etcdURLRegistry != "" {
 		return true
 	}
 	return false
 }
 
-func (cfg *PromsterEtcd) CheckFlags () {
+func (cfg *PromsterEtcd) CheckFlags() {
 	log.Infof("==== Parssing Etcd Variables ====")
 	if cfg.etcdURLScrape == "" {
 		panic("--etcd-url-scrape should be defined")
@@ -77,7 +77,7 @@ func NewPromsterEtcd() *PromsterEtcd {
 	return &promster
 }
 
-func CreateEtcd (cfg *PromsterEtcd){
+func CreateEtcd(cfg *PromsterEtcd) {
 	cfg.nodesChan = make(chan []string, 0)
 	if cfg.hasEtcdRegistry() {
 		log.Debugf("Initializing Registry client. etcdURLRegistry=%s", cfg.etcdURLRegistry)

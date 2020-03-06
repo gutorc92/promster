@@ -28,5 +28,5 @@ require (
 	go.uber.org/multierr v1.2.0 // indirect
 	golang.org/x/time v0.0.0-20190921001708-c4c64cad1fd0 // indirect
 	google.golang.org/grpc v1.24.0 // indirect
-	gopkg.in/yaml.v1 v1.0.0-20140924161607-9f9df34309c0 // indirect
+	gopkg.in/yaml.v1 v1.0.0-20140924161607-9f9df34309c0
 )
