@@ -19,6 +19,7 @@ require (
 	github.com/jonboulle/clockwork v0.1.0 // indirect
 	github.com/minio/highwayhash v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.2.1 // indirect
+	github.com/prometheus/common v0.7.0
 	github.com/prometheus/prometheus v1.8.2-0.20191017095924-6f92ce560538
 	github.com/serialx/hashring v0.0.0-20190515033939-7706f26af194
 	github.com/sirupsen/logrus v1.4.2

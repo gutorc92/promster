@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/config"
+	"github.com/prometheus/prometheus/discovery/targetgroup"
 	"gopkg.in/yaml.v2"
 )
 
@@ -50,9 +52,14 @@ func (cfg *PrometheusConfig) PrintConfig() {
 	// }
 	var scrape config.ScrapeConfig
 	scrape.JobName = "prometheus"
+	var scrape2 config.ScrapeConfig
+	scrape2.JobName = "teste"
 	// scrape.Params.Set("teste", "localhost:9090")
-	// scrape.ServiceDiscoveryConfig.StaticConfigs.Targets.LabelSet
+	group1 := targetgroup.Group{Targets: []model.LabelSet{
+		model.LabelSet{"__address__": "localhost:9090"}}}
+	scrape.ServiceDiscoveryConfig.StaticConfigs = append(scrape.ServiceDiscoveryConfig.StaticConfigs, &group1)
 	cfg.ScrapeConfigs = append(cfg.ScrapeConfigs, &scrape)
+	cfg.ScrapeConfigs = append(cfg.ScrapeConfigs, &scrape2)
 	d := cfg.String()
 	fmt.Printf("--- m dump:\n%s\n\n", d)
 	f, err := os.Create("prometheus_test.yml")
