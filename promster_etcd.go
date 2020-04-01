@@ -18,21 +18,23 @@ type SourceTarget struct {
 }
 
 type PromsterEtcd struct {
-	etcdURLRegistry   string
-	etcdBase          string
-	etcdServiceName   string
-	etcdServiceTTL    int
-	etcdURLScrape     string
-	scrapeEtcdPath    string
-	cliScrape         *clientv3.Client
-	sourceTargetsChan chan []SourceTarget
-	nodesChan         chan []string
+	etcdURLRegistry      string
+	etcdBase             string
+	etcdServiceName      string
+	etcdServiceTTL       int
+	etcdURLScrape        string
+	scrapeEtcdPath       string
+	cliScrape            *clientv3.Client
+	sourceTargetsChan    chan []SourceTarget
+	nodesChan            chan []string
+	scrapeShardingEnable bool
 }
 
 func (cfg *PromsterEtcd) RegisterFlags(f *flag.FlagSet) {
 	flag.StringVar(&cfg.etcdURLRegistry, "registry-etcd-url", "", "ETCD URLs. ex: http://etcd0:2379")
 	flag.StringVar(&cfg.etcdBase, "registry-etcd-base", "/registry", "ETCD base path for services")
 	flag.StringVar(&cfg.etcdServiceName, "registry-service-name", "", "Prometheus cluster service name. Ex.: proml1")
+	flag.BoolVar(&cfg.scrapeShardingEnable, "scrape-shard-enable", false, "Enable sharding distribution among targets so that each Promster instance will scrape a different set of targets, enabling distribution of load among instances. Defaults to true.")
 	flag.IntVar(&cfg.etcdServiceTTL, "registry-node-ttl", -1, "Node registration TTL in ETCD. After killing Promster instance, it will vanish from ETCD registry after this time")
 	flag.StringVar(&cfg.etcdURLScrape, "scrape-etcd-url", "", "ETCD URLs for scrape source server. If empty, will be the same as --etcd-url. ex: http://etcd0:2379")
 	flag.StringVar(&cfg.scrapeEtcdPath, "scrape-etcd-path", "", "Base ETCD path for getting servers to be scrapped")
