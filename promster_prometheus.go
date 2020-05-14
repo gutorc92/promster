@@ -32,6 +32,16 @@ func (cfg *PrometheusConfig) RegisterFlags(f *flag.FlagSet) {
 	metrics.ServiceDiscoveryConfig.FileSDConfigs = append(metrics.ServiceDiscoveryConfig.FileSDConfigs, &fileConfig)
 	// scrape.Params.Set("teste", "localhost:9090")
 	cfg.ScrapeConfigs = append(cfg.ScrapeConfigs, &metrics)
+
+	group2 := targetgroup.Group{Targets: []model.LabelSet{
+		model.LabelSet{"__address__": "alertmanager:9093"}}}
+	alConfig := config.AlertmanagerConfig{Scheme: "http"}
+	alConfig.ServiceDiscoveryConfig.StaticConfigs = append(alConfig.ServiceDiscoveryConfig.StaticConfigs, &group2)
+	cfg.AlertingConfig.AlertmanagerConfigs = append(cfg.AlertingConfig.AlertmanagerConfigs, &alConfig)
+	
+	var remoteWrite config.RemoteWriteConfig
+
+	cfg.RemoteWriteConfigs = append(cfg.RemoteWriteConfigs, &remoteWrite)
 	log.Infof("Testando")
 	log.Debugf("Config scrape interval %s", cfg.GlobalConfig.ScrapeInterval)
 	flag.Var(&cfg.GlobalConfig.ScrapeInterval, "global-scrape-interval", "Prometheus scrape interval")
@@ -40,7 +50,8 @@ func (cfg *PrometheusConfig) RegisterFlags(f *flag.FlagSet) {
 	flag.StringVar(&scrapeMatch, "scrape-match", "", "Metrics regex filter applied on scraped targets. Commonly used in conjunction with /federate metrics endpoint")
 	flag.StringVar(&evaluationInterval, "evaluation-interval", "30s", "Prometheus evaluation interval")
 	flag.StringVar(&metrics.Scheme, "scrape-config-scheme", "http", "Scrape scheme, either http or https")
-
+	flag.StringVar(&alConfig.Scheme, "alertmanager-config-scheme", "http", "Alertmanager scheme, either http or https")
+	flag.Var(&remoteWrite.URL, "remotewrite-config-url", "Remote write url")
 }
 
 func (cfg *PrometheusConfig) String() string {
@@ -64,11 +75,7 @@ func (cfg *PrometheusConfig) PrintConfig() {
 	cfg.ScrapeConfigs = append(cfg.ScrapeConfigs, &prometheusConfig)
 
 	// alert config
-	group2 := targetgroup.Group{Targets: []model.LabelSet{
-		model.LabelSet{"__address__": "alertmanager:9093"}}}
-	alConfig := config.AlertmanagerConfig{Scheme: "http"}
-	alConfig.ServiceDiscoveryConfig.StaticConfigs = append(alConfig.ServiceDiscoveryConfig.StaticConfigs, &group2)
-	cfg.AlertingConfig.AlertmanagerConfigs = append(cfg.AlertingConfig.AlertmanagerConfigs, &alConfig)
+	
 
 	// rules files
 	cfg.RuleFiles = []string{"/rules.yml", "/etc/prometheus/rules-l1.yml", "/etc/prometheus/rules-ln.yml", "/etc/prometheus/alert-rules.yml"}
