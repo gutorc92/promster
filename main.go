@@ -14,23 +14,6 @@ import (
 
 var log = logrus.New()
 
-func setLogLevel(logLevel *string) {
-	switch *logLevel {
-	case "debug":
-		log.SetLevel(logrus.DebugLevel)
-		break
-	case "warning":
-		log.SetLevel(logrus.WarnLevel)
-		break
-	case "error":
-		log.SetLevel(logrus.ErrorLevel)
-		break
-	default:
-		log.Infof("Setando o valor default")
-		log.SetLevel(logrus.InfoLevel)
-	}
-}
-
 func updatePrometheusTargets(scrapeTargets []SourceTarget, promNodes []string, shardingEnabled bool) error {
 	//Apply consistent hashing to determine which scrape endpoints will
 	//be handled by this Prometheus instance
@@ -83,13 +66,18 @@ func main() {
 	cfgPrometheus = NewPrometheusConfig()
 	log.Out = os.Stdout
 	logLevel := flag.String("loglevel", "info", "debug, info, warning, error")
+	ll, err := logrus.ParseLevel(*logLevel)
+	if err != nil {
+		logrus.Errorf("Not able to parse log level string. Setting default level: info.")
+		ll = logrus.InfoLevel
+	}
+	logrus.SetLevel(ll)
 	flagSet := flag.NewFlagSet("etcd", flag.ContinueOnError)
 	flagSetPromster := flag.NewFlagSet("prometheus", flag.ContinueOnError)
 	cfg.RegisterFlags(flagSet)
 	cfgPrometheus.RegisterFlags(flagSetPromster)
 	flag.Parse()
 	cfgPrometheus.PrintConfig()
-	setLogLevel(logLevel)
 	cfg.CheckFlags()
 	log.Debugf("Testandoo valor: %s ", cfg.etcdURLRegistry)
 	log.Infof("====Starting Promster====")
