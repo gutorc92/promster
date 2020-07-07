@@ -60,30 +60,27 @@ func updatePrometheusTargets(scrapeTargets []SourceTarget, promNodes []string, s
 }
 
 func main() {
-	var cfg *PromsterEtcd
-	var cfgPrometheus *PrometheusConfig
-	cfg = NewPromsterEtcd()
-	cfgPrometheus = NewPrometheusConfig()
+	var logLevel string
+	cfg := NewPromsterEtcd()
+	// cfgPrometheus := NewPrometheusConfig()
 	log.Out = os.Stdout
-	logLevel := flag.String("loglevel", "info", "debug, info, warning, error")
-	ll, err := logrus.ParseLevel(*logLevel)
+	flag.StringVar(&logLevel, "log-level", "info", "debug, info, warning, error")
+	ll, err := logrus.ParseLevel(logLevel)
 	if err != nil {
 		logrus.Errorf("Not able to parse log level string. Setting default level: info.")
 		ll = logrus.InfoLevel
 	}
 	logrus.SetLevel(ll)
 	flagSet := flag.NewFlagSet("etcd", flag.ContinueOnError)
-	flagSetPromster := flag.NewFlagSet("prometheus", flag.ContinueOnError)
+	// flagSetPromster := flag.NewFlagSet("prometheus", flag.ContinueOnError)
 	cfg.RegisterFlags(flagSet)
-	cfgPrometheus.RegisterFlags(flagSetPromster)
+	// cfgPrometheus.RegisterFlags(flagSetPromster)
 	flag.Parse()
-	cfgPrometheus.PrintConfig()
+	// cfgPrometheus.PrintConfig()
 	cfg.CheckFlags()
-	log.Debugf("Testandoo valor: %s ", cfg.etcdURLRegistry)
 	log.Infof("====Starting Promster====")
-	CreateEtcd(cfg)
+	cfg.InitWatch()
 	log.Debugf("Initializing ETCD client for source scrape targets")
-	log.Infof("Starting to watch source scrape targets. etcdURLScrape=%s", cfg.etcdURLScrape)
 
 	cfg.createTargets()
 
@@ -104,7 +101,7 @@ func main() {
 		case scrapeTargets = <-cfg.sourceTargetsChan:
 			log.Debugf("updated scapeTargets: %s", scrapeTargets)
 		}
-		err := updatePrometheusTargets(scrapeTargets, promNodes, cfg.scrapeShardingEnable)
+		// err := updatePrometheusTargets(scrapeTargets, promNodes, cfg.scrapeShardingEnable)
 		if err != nil {
 			log.Warnf("Couldn't update Prometheus scrape targets. err=%s", err)
 		}

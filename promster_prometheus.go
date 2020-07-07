@@ -19,6 +19,19 @@ func NewPrometheusConfig() *PrometheusConfig {
 	return &config
 }
 
+type Env struct {
+	name    string
+	version string
+	ips     []string
+}
+
+type App struct {
+	name   string
+	path   string
+	scheme string
+	envs   []Env
+}
+
 func (cfg *PrometheusConfig) RegisterFlags(f *flag.FlagSet) {
 	var (
 		scrapeMatch        string
