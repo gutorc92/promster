@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"context"
 	"flag"
 	"fmt"
@@ -12,11 +13,6 @@ import (
 	etcdregistry "github.com/flaviostutz/etcd-registry/etcd-registry"
 )
 
-type SourceTarget struct {
-	Targets []string          `json:"targets"`
-	Labels  map[string]string `json:"labels,omitempty"`
-}
-
 type PromsterEtcd struct {
 	URLRegistry       string
 	Base              string
@@ -25,13 +21,14 @@ type PromsterEtcd struct {
 	URLScrape         string
 	scrapeEtcdPath    string
 	cliScrape         *clientv3.Client
-	sourceTargetsChan chan []SourceTarget
+	cliRegistry				*clientv3.Client
+	appsChan          chan []App
 	nodesChan         chan []string
 	Sharding          bool
 	nodeName          string
 }
 
-func (cfg *PromsterEtcd) RegisterFlags(f *flag.FlagSet) {
+func (cfg *PromsterEtcd) RegisterFlags() {
 	flag.StringVar(&cfg.URLRegistry, "registry-etcd-url", "", "ETCD URLs. ex: http://etcd0:2379")
 	flag.StringVar(&cfg.Base, "registry-etcd-base", "/registry", "ETCD base path for services")
 	flag.StringVar(&cfg.ServiceName, "registry-service-name", "", "Prometheus cluster service name. Ex.: proml1")
@@ -80,38 +77,45 @@ func NewPromsterEtcd() *PromsterEtcd {
 	return &promster
 }
 
-func (cfg *PromsterEtcd) createRegistry() *clientv3.Client {
+func (cfg *PromsterEtcd) servicePath() string {
+	servicePath := fmt.Sprintf("%s/%s/", cfg.Base, cfg.ServiceName)
+	return servicePath
+}
+
+func (cfg *PromsterEtcd) InitClients () {
+	endpointsScrape := strings.Split(cfg.URLScrape, ",")
+	cliScrape, err := clientv3.New(clientv3.Config{Endpoints: endpointsScrape, DialTimeout: 10 * time.Second})
+	if err != nil {
+		log.Errorf("Could not initialize ETCD client. err=%s", err)
+		panic(err)
+	}
+	cfg.cliScrape = cliScrape
 	endpointsRegistry := strings.Split(cfg.URLRegistry, ",")
 	cliRegistry, err := clientv3.New(clientv3.Config{Endpoints: endpointsRegistry, DialTimeout: 10 * time.Second})
 	if err != nil {
 		log.Errorf("Could not initialize ETCD client. err=%s", err)
 		panic(err)
 	}
-	return cliRegistry
+	cfg.cliRegistry = cliRegistry
 }
 
-func (cfg *PromsterEtcd) servicePath() string {
-	servicePath := fmt.Sprintf("%s/%s/", cfg.Base, cfg.ServiceName)
-	return servicePath
-}
-
-func (cfg *PromsterEtcd) InitWatch() {
+func (cfg *PromsterEtcd) InitPromsterEtcd() {
+	cfg.InitClients()
 	cfg.nodesChan = make(chan []string, 0)
+	cfg.appsChan = make(chan []App, 0)
 	cfg.nodeName = getSelfNodeName()
-	if cfg.hasEtcdRegistry() {
-		log.Infof("Keeping self node registered on ETCD...")
-		go cfg.keepSelfNodeRegistered()
-		log.Infof("Starting to watch registered prometheus nodes...")
-		// go watchRegisteredNodes(cliRegistry, servicePath, cfg.nodesChan)
-		go cfg.watchRegisteredNodes()
-	} else {
-		go func() {
-			cfg.nodesChan <- []string{cfg.nodeName}
-		}()
-	}
 }
 
-func (cfg *PromsterEtcd) keepSelfNodeRegistered() {
+func InitWatch(cfg *PromsterEtcd) {
+	log.Infof("Starting to watch scrape targets...")
+	go watchTargets(cfg)
+	log.Infof("Keeping self node registered on ETCD...")
+	go registerNode(cfg)
+	log.Infof("Starting to watch registered prometheus nodes...")
+	go watchNodes(cfg)
+}
+
+func registerNode(cfg *PromsterEtcd) {
 	endpointsRegistry := strings.Split(cfg.URLRegistry, ",")
 	registry, err := etcdregistry.NewEtcdRegistry(endpointsRegistry, cfg.Base, 10*time.Second)
 	if err != nil {
@@ -126,26 +130,11 @@ func (cfg *PromsterEtcd) keepSelfNodeRegistered() {
 	}
 }
 
-func (cfg *PromsterEtcd) createTargets() {
-	log.Debugf("Initializing ETCD client for source scrape targets")
-	log.Infof("Starting to watch source scrape targets. etcdURLScrape=%s", cfg.URLScrape)
-	endpointsScrape := strings.Split(cfg.URLScrape, ",")
-	cliScrape, err := clientv3.New(clientv3.Config{Endpoints: endpointsScrape, DialTimeout: 10 * time.Second})
-	if err != nil {
-		log.Errorf("Could not initialize ETCD client. err=%s", err)
-		panic(err)
-	}
-	log.Infof("Etcd client initialized for scrape")
-	cfg.sourceTargetsChan = make(chan []SourceTarget, 0)
-	go watchSourceScrapeTargets(cliScrape, cfg.scrapeEtcdPath, cfg.sourceTargetsChan)
-}
-
-func (cfg *PromsterEtcd) watchRegisteredNodes() {
-	cli := cfg.createRegistry()
-	watchChan := cli.Watch(context.TODO(), cfg.servicePath(), clientv3.WithPrefix())
+func watchNodes(cfg *PromsterEtcd) {
+	watchChan := cfg.cliRegistry.Watch(context.TODO(), cfg.servicePath(), clientv3.WithPrefix())
 	for {
 		log.Debugf("Registered nodes updated")
-		rsp, err0 := cli.Get(context.TODO(), cfg.servicePath(), clientv3.WithPrefix())
+		rsp, err0 := cfg.cliRegistry.Get(context.TODO(), cfg.servicePath(), clientv3.WithPrefix())
 		if err0 != nil {
 			log.Warnf("Error retrieving service nodes. err=%s", err0)
 		}
@@ -173,30 +162,37 @@ func getSelfNodeName() string {
 	return fmt.Sprintf("%s:9090", strings.TrimSpace(hostip))
 }
 
-func watchSourceScrapeTargets(cli *clientv3.Client, sourceTargetsPath string, sourceTargetsChan chan []SourceTarget) {
-	log.Debugf("Getting source scrape targets from %s", sourceTargetsPath)
-
-	watchChan := cli.Watch(context.TODO(), sourceTargetsPath, clientv3.WithPrefix())
+func watchTargets(cfg *PromsterEtcd) {
+	cfgPrometheus := PrometheusConfig{}
+	log.Infof("Testando o info na funcao")
+	log.Infof("Getting source scrape targets from %s", cfg.scrapeEtcdPath)
+	watchChan := cfg.cliScrape.Watch(context.TODO(), cfg.scrapeEtcdPath, clientv3.WithPrefix())
 	for {
-		log.Debugf("Source scrape targets updated")
-		rsp, err0 := cli.Get(context.TODO(), sourceTargetsPath, clientv3.WithPrefix())
+		log.Infof("Source scrape targets updated")
+		rsp, err0 := cfg.cliScrape.Get(context.TODO(), cfg.scrapeEtcdPath, clientv3.WithPrefix())
 		if err0 != nil {
 			log.Warnf("Error retrieving source scrape targets. err=%s", err0)
 		}
-
 		if len(rsp.Kvs) == 0 {
-			log.Debugf("No source scrape targets were found under %s", sourceTargetsPath)
+			log.Infof("No source scrape targets were found under %s", cfg.scrapeEtcdPath)
 
 		} else {
-			sourceTargets := make([]SourceTarget, 0)
+			appsTargets := make([]App, 0)
 			for _, kv := range rsp.Kvs {
 				record := string(kv.Key)
-				targetAddress := path.Base(record)
-				serviceName := path.Base(path.Dir(record))
-				sourceTargets = append(sourceTargets, SourceTarget{Labels: map[string]string{"prsn": serviceName}, Targets: []string{targetAddress}})
+				app := App{}
+				app.Name = record
+				log.Infof("Value found %s", string(kv.Value))
+				err := json.Unmarshal([]byte(kv.Value), &app)
+				if err != nil {
+						log.Infof("Error unmarshal %s", err)
+					} else {
+						appsTargets = append(appsTargets, app)
+				}
 			}
-			sourceTargetsChan <- sourceTargets
-			log.Debugf("Found source scrape targets: %s", sourceTargets)
+			cfgPrometheus.PrintConfig(appsTargets, cfg.nodeName)
+			cfg.appsChan <- appsTargets
+			log.Infof("Found source scrape targets: %s", appsTargets)
 		}
 		<-watchChan
 	}

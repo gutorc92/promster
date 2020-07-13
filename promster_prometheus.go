@@ -4,7 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
-
+	"time"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/config"
 	"github.com/prometheus/prometheus/discovery/file"
@@ -14,25 +14,23 @@ import (
 
 type PrometheusConfig config.Config
 
-func NewPrometheusConfig() *PrometheusConfig {
-	var config PrometheusConfig
-	return &config
-}
-
 type Env struct {
-	name    string
-	version string
-	ips     []string
+	Name    string
+	Version string
+	Ips     []string
 }
 
 type App struct {
-	name   string
-	path   string
-	scheme string
-	envs   []Env
+	Name        string    `json:"_name"`
+	Description string    `json:"_desc"`
+	Path        []string  `json:"_scrapePath"`
+	Namespace   string    `json:"_namespace"`
+	Scheme      string 
+	Envs        []Env     `json:"_envs"`
+	Ips					[] string `json:"_ips"`
 }
 
-func (cfg *PrometheusConfig) RegisterFlags(f *flag.FlagSet) {
+func (cfg *PrometheusConfig) RegisterFlags() {
 	var (
 		scrapeMatch        string
 		evaluationInterval string
@@ -64,17 +62,36 @@ func (cfg *PrometheusConfig) String() string {
 	return string(b)
 }
 
-func (cfg *PrometheusConfig) PrintConfig() {
+func (cfg *PrometheusConfig) PrintConfig(apps []App, nodeName string) {
 	// d, err := yaml.Marshal(&cfg.GlobalConfig)
 	// if err != nil {
 	// 	log.Fatalf("error: %v", err)
 	// }
+	cfg.GlobalConfig.ScrapeInterval = model.Duration(15 * time.Second)
+	cfg.GlobalConfig.ScrapeTimeout = model.Duration(15 * time.Second)
+	cfg.GlobalConfig.EvaluationInterval = model.Duration(15 * time.Second)
 	var prometheusConfig config.ScrapeConfig
 	prometheusConfig.JobName = "prometheus"
-	group1 := targetgroup.Group{Targets: []model.LabelSet{
-		model.LabelSet{"__address__": "localhost:9090"}}}
-	prometheusConfig.ServiceDiscoveryConfig.StaticConfigs = append(prometheusConfig.ServiceDiscoveryConfig.StaticConfigs, &group1)
+	prometheusGroup := targetgroup.Group{Targets: []model.LabelSet{
+		model.LabelSet{"__address__": model.LabelValue(nodeName)}}}
+	prometheusConfig.ServiceDiscoveryConfig.StaticConfigs = append(prometheusConfig.ServiceDiscoveryConfig.StaticConfigs, &prometheusGroup)
 	cfg.ScrapeConfigs = append(cfg.ScrapeConfigs, &prometheusConfig)
+
+	for _, app := range apps {
+		for _, path := range app.Path {
+			var scrapeConfig config.ScrapeConfig
+			scrapeConfig.JobName = path
+			var address []model.LabelSet
+			for _, ip := range app.Ips {
+				lbValue := model.LabelValue(ip)
+				label := model.LabelSet{"__address__": lbValue}
+				address = append(address, label)
+			}
+			group1 := targetgroup.Group{Targets: address}
+			scrapeConfig.ServiceDiscoveryConfig.StaticConfigs = append(scrapeConfig.ServiceDiscoveryConfig.StaticConfigs, &group1)
+			cfg.ScrapeConfigs = append(cfg.ScrapeConfigs, &scrapeConfig)
+		}
+	}
 
 	// alert config
 	group2 := targetgroup.Group{Targets: []model.LabelSet{
@@ -96,5 +113,4 @@ func (cfg *PrometheusConfig) PrintConfig() {
 		log.Fatalf("error: %v", err)
 	}
 	fmt.Println(l, "bytes written successfully")
-	fmt.Println("Global config", cfg.GlobalConfig.ScrapeInterval)
 }
