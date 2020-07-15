@@ -13,56 +13,13 @@ import (
 
 var log = logrus.New()
 
-// func updatePrometheusTargets(scrapeTargets []SourceTarget, promNodes []string, shardingEnabled bool) error {
-// 	//Apply consistent hashing to determine which scrape endpoints will
-// 	//be handled by this Prometheus instance
-// 	logrus.Debugf("updatePrometheusTargets. scrapeTargets=%s, promNodes=%s", scrapeTargets, promNodes)
-
-// 	ring := hashring.New(hashList(promNodes))
-// 	selfNodeName := getSelfNodeName()
-// 	selfScrapeTargets := make([]SourceTarget, 0)
-// 	for _, starget := range scrapeTargets {
-// 		hashedPromNode, ok := ring.GetNode(stringSha512(starget.Targets[0]))
-// 		if !ok {
-// 			return fmt.Errorf("Couldn't get prometheus node for %s in consistent hash", starget.Targets[0])
-// 		}
-// 		logrus.Debugf("Target %s - Prometheus %x", starget, hashedPromNode)
-// 		hashedSelf := stringSha512(selfNodeName)
-// 		if !shardingEnabled || hashedSelf == hashedPromNode {
-// 			logrus.Debugf("Target %s - Prometheus %s", starget, selfNodeName)
-// 			selfScrapeTargets = append(selfScrapeTargets, starget)
-// 		}
-// 	}
-
-// 	//generate json file
-// 	contents, err := json.Marshal(selfScrapeTargets)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	logrus.Debugf("Writing /servers.json: '%s'", string(contents))
-// 	err = ioutil.WriteFile("/servers.json", contents, 0666)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	//force Prometheus to update its configuration live
-// 	_, err = ExecShell("wget --post-data='' http://localhost:9090/-/reload -O -")
-// 	if err != nil {
-// 		return err
-// 	}
-// 	output, err0 := ExecShell("kill -HUP $(ps | grep prometheus | awk '{print $1}' | head -1)")
-// 	if err0 != nil {
-// 		logrus.Warnf("Could not reload Prometheus configuration. err=%s. output=%s", err0, output)
-// 	}
-
-// 	return nil
-// }
-
 func main() {
 	var logLevel string
+	var sharding bool
 	cfg := NewPromsterEtcd()
 	// cfgPrometheus := NewPrometheusConfig()
 	flag.StringVar(&logLevel, "log-level", "info", "debug, info, warning, error")
+	flag.BoolVar(&sharding, "scrape-shard-enable", false, "Enable sharding distribution among targets so that each Promster instance will scrape a different set of targets, enabling distribution of load among instances. Defaults to true.")
 	cfg.RegisterFlags()
 	// cfgPrometheus.RegisterFlags(flagSetPromster)
 	flag.Parse()
@@ -95,6 +52,9 @@ func main() {
 			log.Debugf("updated promNodes: %s", promNodes)
 		case appsTargets = <-cfg.appsChan:
 			log.Infof("updated scapeTargets: %s", appsTargets)
+			cfgPrometheus := PrometheusConfig{}
+			cfgPrometheus.PrintConfig(appsTargets, cfg.nodeName, sharding)
+			cfgPrometheus.ReloadPrometheus()
 
 		}
 		// err := updatePrometheusTargets(scrapeTargets, promNodes, cfg.scrapeShardingEnable)

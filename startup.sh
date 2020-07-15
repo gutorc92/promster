@@ -4,14 +4,7 @@ set -x
 
 echo "Starting Promster..."
 promster \
-    --loglevel=$LOG_LEVEL \
-    --scheme=$SCHEME \
-    --tls-insecure=$TLS_INSECURE \
-    --evaluation-interval=$EVALUATION_INTERVAL \
-    --scrape-interval=$SCRAPE_INTERVAL \
-    --scrape-timeout=$SCRAPE_TIMEOUT \
-    --scrape-paths=$SCRAPE_PATHS \
-    --scrape-match=$SCRAPE_MATCH_REGEX \
+    -log-level=$LOG_LEVEL \
     --scrape-shard-enable=$SCRAPE_SHARD_ENABLE \
     --scrape-etcd-url=$SCRAPE_ETCD_URL \
     --scrape-etcd-path=$SCRAPE_ETCD_PATH \

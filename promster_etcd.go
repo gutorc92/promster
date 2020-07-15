@@ -32,7 +32,6 @@ func (cfg *PromsterEtcd) RegisterFlags() {
 	flag.StringVar(&cfg.URLRegistry, "registry-etcd-url", "", "ETCD URLs. ex: http://etcd0:2379")
 	flag.StringVar(&cfg.Base, "registry-etcd-base", "/registry", "ETCD base path for services")
 	flag.StringVar(&cfg.ServiceName, "registry-service-name", "", "Prometheus cluster service name. Ex.: proml1")
-	flag.BoolVar(&cfg.Sharding, "scrape-shard-enable", false, "Enable sharding distribution among targets so that each Promster instance will scrape a different set of targets, enabling distribution of load among instances. Defaults to true.")
 	flag.IntVar(&cfg.ServiceTTL, "registry-node-ttl", -1, "Node registration TTL in ETCD. After killing Promster instance, it will vanish from ETCD registry after this time")
 	flag.StringVar(&cfg.URLScrape, "scrape-etcd-url", "", "ETCD URLs for scrape source server. If empty, will be the same as --etcd-url. ex: http://etcd0:2379")
 	flag.StringVar(&cfg.scrapeEtcdPath, "scrape-etcd-path", "", "Base ETCD path for getting servers to be scrapped")
@@ -48,7 +47,7 @@ func (cfg *PromsterEtcd) hasEtcdRegistry() bool {
 func (cfg *PromsterEtcd) CheckFlags() {
 	log.Infof("==== Parssing Etcd Variables ====")
 	if cfg.URLScrape == "" {
-		panic("--etcd-url-scrape should be defined")
+		panic("--scrape-etcd-url should be defined")
 	}
 	log.Debugf("Etcd URL Scrape: %s", cfg.URLScrape)
 
@@ -67,7 +66,7 @@ func (cfg *PromsterEtcd) CheckFlags() {
 		log.Debugf("Etcd Service TTL: %d", cfg.ServiceTTL)
 	}
 	if cfg.scrapeEtcdPath == "" {
-		panic("--scrape-etcd-path should be defined")
+		log.Debugf("Scrape Etcd Path: %s", cfg.scrapeEtcdPath)
 	}
 	log.Debugf("Scrape Etcd Path: %s", cfg.scrapeEtcdPath)
 }
@@ -163,7 +162,6 @@ func getSelfNodeName() string {
 }
 
 func watchTargets(cfg *PromsterEtcd) {
-	cfgPrometheus := PrometheusConfig{}
 	log.Infof("Testando o info na funcao")
 	log.Infof("Getting source scrape targets from %s", cfg.scrapeEtcdPath)
 	watchChan := cfg.cliScrape.Watch(context.TODO(), cfg.scrapeEtcdPath, clientv3.WithPrefix())
@@ -190,7 +188,6 @@ func watchTargets(cfg *PromsterEtcd) {
 						appsTargets = append(appsTargets, app)
 				}
 			}
-			cfgPrometheus.PrintConfig(appsTargets, cfg.nodeName)
 			cfg.appsChan <- appsTargets
 			log.Infof("Found source scrape targets: %s", appsTargets)
 		}
