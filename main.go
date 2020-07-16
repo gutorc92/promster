@@ -15,11 +15,12 @@ var log = logrus.New()
 
 func main() {
 	var logLevel string
-	var sharding bool
 	cfg := NewPromsterEtcd()
+	promConfig := PromsterConfig{}
 	// cfgPrometheus := NewPrometheusConfig()
 	flag.StringVar(&logLevel, "log-level", "info", "debug, info, warning, error")
-	flag.BoolVar(&sharding, "scrape-shard-enable", false, "Enable sharding distribution among targets so that each Promster instance will scrape a different set of targets, enabling distribution of load among instances. Defaults to true.")
+	flag.StringVar(&promConfig.PrometheusPathFile, "prometheus-dir-file", "/", "Dir file where prometheus.yml will be saved.")
+	flag.BoolVar(&promConfig.ShardingEnabled, "scrape-shard-enable", false, "Enable sharding distribution among targets so that each Promster instance will scrape a different set of targets, enabling distribution of load among instances. Defaults to true.")
 	cfg.RegisterFlags()
 	// cfgPrometheus.RegisterFlags(flagSetPromster)
 	flag.Parse()
@@ -35,27 +36,24 @@ func main() {
 	cfg.InitPromsterEtcd()
 
 	InitWatch(cfg)
-
-	promNodes := make([]string, 0)
-	appsTargets := make([]App, 0)
+	
+	promConfig.NodeName = cfg.NodeName
 	go func() {
 		for {
-			log.Debugf("Prometheus nodes found: %s", promNodes)
-			log.Debugf("Scrape targets found: %s", appsTargets)
+			log.Debugf("Prometheus nodes found: %s", promConfig.PromNodesName)
+			log.Debugf("Scrape targets found: %s", promConfig.AppsTargets)
 			time.Sleep(5 * time.Second)
 		}
 	}()
 
 	for {
 		select {
-		case promNodes = <-cfg.nodesChan:
-			log.Debugf("updated promNodes: %s", promNodes)
-		case appsTargets = <-cfg.appsChan:
-			log.Infof("updated scapeTargets: %s", appsTargets)
-			cfgPrometheus := PrometheusConfig{}
-			cfgPrometheus.PrintConfig(appsTargets, cfg.nodeName, sharding)
-			cfgPrometheus.ReloadPrometheus()
-
+		case promConfig.PromNodesName = <-cfg.nodesChan:
+			log.Debugf("updated promNodes: %s", promConfig.PromNodesName)
+		case promConfig.AppsTargets = <-cfg.appsChan:
+			log.Infof("updated scapeTargets: %s", promConfig.PromNodesName)
+			promConfig.PrintConfig()
+			promConfig.ReloadPrometheus()
 		}
 		// err := updatePrometheusTargets(scrapeTargets, promNodes, cfg.scrapeShardingEnable)
 		if err != nil {

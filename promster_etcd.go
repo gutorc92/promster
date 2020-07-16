@@ -20,12 +20,14 @@ type PromsterEtcd struct {
 	ServiceTTL        int
 	URLScrape         string
 	scrapeEtcdPath    string
+	SettingsPath      chan string
 	cliScrape         *clientv3.Client
 	cliRegistry				*clientv3.Client
 	appsChan          chan []App
+	settingsChan      chan []Setting
 	nodesChan         chan []string
 	Sharding          bool
-	nodeName          string
+	NodeName          string
 }
 
 func (cfg *PromsterEtcd) RegisterFlags() {
@@ -102,7 +104,7 @@ func (cfg *PromsterEtcd) InitPromsterEtcd() {
 	cfg.InitClients()
 	cfg.nodesChan = make(chan []string, 0)
 	cfg.appsChan = make(chan []App, 0)
-	cfg.nodeName = getSelfNodeName()
+	cfg.NodeName = getSelfNodeName()
 }
 
 func InitWatch(cfg *PromsterEtcd) {
@@ -121,7 +123,7 @@ func registerNode(cfg *PromsterEtcd) {
 		panic(err)
 	}
 	node := etcdregistry.Node{}
-	node.Name = cfg.nodeName
+	node.Name = cfg.NodeName
 	log.Debugf("Registering Prometheus instance on ETCD registry. service=%s; node=%s", cfg.ServiceName, node)
 	err = registry.RegisterNode(context.TODO(), cfg.ServiceName, node, time.Duration(cfg.ServiceTTL)*time.Second)
 	if err != nil {
@@ -161,6 +163,27 @@ func getSelfNodeName() string {
 	return fmt.Sprintf("%s:9090", strings.TrimSpace(hostip))
 }
 
+func loadAppSettings(cfg *PromsterEtcd, app *App) {
+	settingsPath := fmt.Sprintf("/settings/%s", app.Namespace)
+	rsp, err0 := cfg.cliScrape.Get(context.TODO(), settingsPath, clientv3.WithPrefix())
+	if err0 != nil {
+		log.Warnf("Error retrieving setting scrape targets. err=%s", err0)
+	}
+	log.Infof("Settings found: %d", len(rsp.Kvs))
+	// cfg.SettingsPath <- settingsPath
+	for _, kv := range rsp.Kvs {
+		log.Infof("Settings found %s", string(kv.Value))
+		var setting Setting
+		err := json.Unmarshal([]byte(kv.Value), &setting)
+		if err != nil {
+			log.Infof("Error unmarshal settings %s", err)
+		}
+		log.Infof("Settins unmarshall %+v", setting)
+		app.Setting = &setting
+		// return &setting
+	}
+}
+
 func watchTargets(cfg *PromsterEtcd) {
 	log.Infof("Testando o info na funcao")
 	log.Infof("Getting source scrape targets from %s", cfg.scrapeEtcdPath)
@@ -180,12 +203,13 @@ func watchTargets(cfg *PromsterEtcd) {
 				record := string(kv.Key)
 				app := App{}
 				app.Name = record
-				log.Infof("Value found %s", string(kv.Value))
+				log.Infof("App found %s", string(kv.Value))
 				err := json.Unmarshal([]byte(kv.Value), &app)
 				if err != nil {
-						log.Infof("Error unmarshal %s", err)
-					} else {
-						appsTargets = append(appsTargets, app)
+					log.Infof("Error unmarshal app %s", err)
+				} else {
+					loadAppSettings(cfg, &app)
+					appsTargets = append(appsTargets, app)
 				}
 			}
 			cfg.appsChan <- appsTargets
